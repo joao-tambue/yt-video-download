@@ -1,0 +1,285 @@
+import { useState, useEffect } from 'react'
+import { motion, AnimatePresence } from 'motion/react'
+import { Check, Download, Youtube } from 'lucide-react'
+
+import When from '../components/When'
+import { List } from '../components/List'
+import { BASE_URL } from '../constants/api'
+import { Loading } from '../components/Loading'
+import { usePlaylist } from '../hooks/use-playlist'
+import { VideoSearchInput } from '../components/VideoSearchInput'
+
+interface Video {
+  id: string
+  title: string
+  description: string
+  duration: string
+  image_cover: string
+  selected: boolean
+  url: string
+}
+
+export default function Home() {
+  const [url, setUrl] = useState('')
+  const { analyzePlaylist, data, loading, error } = usePlaylist()
+
+  const [videos, setVideos] = useState<Video[]>([])
+
+  useEffect(() => {
+    if (data?.videos) {
+      const processedVideos = data.videos.map((video) => ({
+        id: video.id,
+        title: video.title,
+        description: '',
+        duration: formatDuration(video.duration),
+        image_cover: video.image_cover,
+        selected: true,
+        url: video.url,
+      }))
+
+      setVideos(processedVideos)
+    }
+  }, [data])
+
+  const handleProcessPlaylist = async () => {
+    if (!url.trim()) return
+
+    await analyzePlaylist(url)
+  }
+
+  const formatDuration = (seconds: number): string => {
+    const minutes = Math.floor(seconds / 60)
+    const remainingSeconds = seconds % 60
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`
+  }
+
+  const toggleVideoSelection = (id: string) => {
+    setVideos(
+      videos.map((video) => (video.id === id ? { ...video, selected: !video.selected } : video))
+    )
+  }
+
+  const selectAll = () => {
+    setVideos(videos.map((video) => ({ ...video, selected: true })))
+  }
+
+  const deselectAll = () => {
+    setVideos(videos.map((video) => ({ ...video, selected: false })))
+  }
+
+  const [downloadProgress, setDownloadProgress] = useState(0)
+  const [isDownloading, setIsDownloading] = useState(false)
+
+
+  const handleDownload = async () => {
+  try {
+    const selectedVideos = videos
+      .filter((v) => v.selected)
+      .map((v) => ({ url: v.url }))
+
+    if (selectedVideos.length === 0) return
+
+    setIsDownloading(true)
+    setDownloadProgress(0)
+
+    const response = await fetch(`${BASE_URL}/downloads/videos`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ videos: selectedVideos }),
+    })
+
+    if (!response.ok) throw new Error('Erro ao gerar o arquivo')
+
+    const reader = response.body?.getReader()
+    const contentLength = Number(response.headers.get('content-length'))
+
+    if (!reader || !contentLength) {
+      throw new Error('Não foi possível rastrear o progresso do download')
+    }
+
+    const chunks: BlobPart[] = []
+    let receivedLength = 0
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+
+      chunks.push(value)
+      receivedLength += value.length
+
+      const percent = Math.round((receivedLength / contentLength) * 100)
+      setDownloadProgress(percent)
+    }
+
+    const blob = new Blob(chunks, { type: 'application/zip' })
+    const url = window.URL.createObjectURL(blob)
+
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'videos.zip'
+    document.body.appendChild(a)
+    a.click()
+
+    a.remove()
+    window.URL.revokeObjectURL(url)
+    setDownloadProgress(0)
+  } catch (err: any) {
+    console.error(err)
+    alert(err.message || 'Erro inesperado')
+  } finally {
+    setIsDownloading(false)
+  }
+}
+
+
+  const improveDurationFormat = (duration: string) => {
+    const parts = duration.split(':')
+
+    if (parts[0].length > 2) {
+      const hours = parts[0].slice(0, parts[0].length - 2)
+      const minutes = parts[0].slice(-2)
+
+      return `${hours}:${minutes}:${parts[1]}`
+    }
+
+    return duration
+  }
+
+  const selectedCount = videos.filter((v) => v.selected).length
+
+  console.log('VIDEOS: ', videos)
+
+  return (
+    <div className="min-h-screen bg-black text-white p-6">
+      <div className="max-w-4xl mx-auto">
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center mb-12 mt-8"
+        >
+          <div className="flex flex-col items-center justify-center gap-3 mb-4">
+            <Youtube className="w-12 h-12 text-violet-500" />
+            <h1 className="text-3xl tmd:ext-4xl font-bold bg-gradient-to-r from-violet-500 to-purple-600 bg-clip-text text-transparent">
+              YouTube Playlist Downloader
+            </h1>
+          </div>
+          <p className="text-gray-400">Baixe todas as vídeo aulas de uma playlist de uma só vez</p>
+        </motion.div>
+
+        <VideoSearchInput
+          url={url}
+          error={error}
+          loading={loading}
+          setUrl={setUrl}
+          handleProcessPlaylist={handleProcessPlaylist}
+        />
+
+        <AnimatePresence>
+          <When expr={loading}>
+            <Loading />
+          </When>
+        </AnimatePresence>
+
+        <When expr={data?.videos && !loading}>
+          <AnimatePresence>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+            >
+              <div className="mb-6 flex items-center justify-between">
+                <h2 className="text-xl md:text-2xl font-semibold text-violet-400">
+                  {data?.title} ({data?.count_videos})
+                </h2>
+                <div className="flex items-center gap-2">
+                  <p className="text-gray-400">
+                    {selectedCount} selecionado{selectedCount !== 1 ? 's' : ''}
+                  </p>
+                  <button
+                    onClick={selectAll}
+                    className="px-3 py-1 bg-violet-600 hover:bg-violet-500 rounded text-sm font-medium transition-colors"
+                  >
+                    Selecionar Todos
+                  </button>
+                  <button
+                    onClick={deselectAll}
+                    className="px-3 py-1 bg-gray-600 hover:bg-gray-500 rounded text-sm font-medium transition-colors"
+                  >
+                    Desselecionar Todos
+                  </button>
+                </div>
+              </div>
+
+              {/* Lista de videos */}
+              <div className="space-y-3 mb-8">
+                <List<Video> items={videos}>
+                  {({ item, index }) => (
+                    <motion.div
+                      key={item.id}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.1 }}
+                      onClick={() => toggleVideoSelection(item.id)}
+                      className={`bg-zinc-900 rounded-lg p-4 border transition-all cursor-pointer hover:scale-[1.02] ${
+                        item.selected
+                          ? 'bg-violet-600 shadow-lg shadow-violet-500/10 border-violet-400'
+                          : 'border-gray-800 hover:border-gray-700'
+                      }`}
+                    >
+                      <div className="relative flex items-center gap-4">
+                        <div className="relative w-32 h-20 rounded overflow-hidden flex-shrink-0">
+                          <img
+                            src={item.image_cover || '/yt-icon.png'}
+                            alt={item.title}
+                            className="w-full h-full object-cover"
+                          />
+                          <div className="absolute bottom-1 right-1 bg-black/80 px-1.5 py-0.5 rounded text-xs">
+                            {improveDurationFormat(item.duration)}
+                          </div>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-medium text-white truncate">{item.title}</h3>
+
+                          <p className="text-sm text-gray-500 mt-1">Duração: {item.duration}</p>
+                        </div>
+                        <div
+                          className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all ${
+                            item.selected ? 'bg-transparent border-violet-400' : 'border-gray-600'
+                          }`}
+                        >
+                          <When expr={item.selected}>
+                            <Check className="w-4 h-4 text-violet-400" />
+                          </When>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </List>
+              </div>
+
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.5 }}
+                className="sticky bottom-6 bg-zinc-900 rounded-xl p-6 border border-violet-500/20 shadow-2xl shadow-violet-500/20"
+              >
+                <button
+                  onClick={handleDownload}
+                  disabled={selectedCount === 0}
+                  className="w-full py-4 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 disabled:from-gray-700 disabled:to-gray-700 disabled:cursor-not-allowed rounded-lg font-semibold transition-all transform hover:scale-[1.02] active:scale-95 shadow-lg shadow-violet-500/30 flex items-center justify-center gap-3"
+                >
+                  <Download className="w-5 h-5" />
+                  {isDownloading
+                    ? `Baixando... ${downloadProgress}%`
+                    : selectedCount > 0
+                    ? `Baixar ${selectedCount} Vídeo${selectedCount !== 1 ? 's' : ''}`
+                    : 'Selecione pelo menos um vídeo'}
+                </button>
+              </motion.div>
+            </motion.div>
+          </AnimatePresence>
+        </When>
+      </div>
+    </div>
+  )
+}

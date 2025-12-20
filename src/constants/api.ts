@@ -1,0 +1,1 @@
+export const BASE_URL = "https://kmgtz1w8-8000.uks1.devtunnels.ms/api/v1"
