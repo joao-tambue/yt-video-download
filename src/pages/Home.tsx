@@ -70,67 +70,63 @@ export default function Home() {
   const [downloadProgress, setDownloadProgress] = useState(0)
   const [isDownloading, setIsDownloading] = useState(false)
 
-
   const handleDownload = async () => {
-  try {
-    const selectedVideos = videos
-      .filter((v) => v.selected)
-      .map((v) => ({ url: v.url }))
+    try {
+      const selectedVideos = videos.filter((v) => v.selected).map((v) => ({ url: v.url }))
 
-    if (selectedVideos.length === 0) return
+      if (selectedVideos.length === 0) return
 
-    setIsDownloading(true)
-    setDownloadProgress(0)
+      setIsDownloading(true)
+      setDownloadProgress(0)
 
-    const response = await fetch(`${BASE_URL}/downloads/videos`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ videos: selectedVideos }),
-    })
+      const response = await fetch(`${BASE_URL}/downloads/videos`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ videos: selectedVideos }),
+      })
 
-    if (!response.ok) throw new Error('Erro ao gerar o arquivo')
+      if (!response.ok) throw new Error('Erro ao gerar o arquivo')
 
-    const reader = response.body?.getReader()
-    const contentLength = Number(response.headers.get('content-length'))
+      const reader = response.body?.getReader()
+      const contentLength = Number(response.headers.get('content-length'))
 
-    if (!reader || !contentLength) {
-      throw new Error('Não foi possível rastrear o progresso do download')
+      if (!reader || !contentLength) {
+        throw new Error('Não foi possível rastrear o progresso do download')
+      }
+
+      const chunks: BlobPart[] = []
+      let receivedLength = 0
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        chunks.push(value)
+        receivedLength += value.length
+
+        const percent = Math.round((receivedLength / contentLength) * 100)
+        setDownloadProgress(percent)
+      }
+
+      const blob = new Blob(chunks, { type: 'application/zip' })
+      const url = window.URL.createObjectURL(blob)
+
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'videos.zip'
+      document.body.appendChild(a)
+      a.click()
+
+      a.remove()
+      window.URL.revokeObjectURL(url)
+      setDownloadProgress(0)
+    } catch (err: any) {
+      console.error(err)
+      alert(err.message || 'Erro inesperado')
+    } finally {
+      setIsDownloading(false)
     }
-
-    const chunks: BlobPart[] = []
-    let receivedLength = 0
-
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-
-      chunks.push(value)
-      receivedLength += value.length
-
-      const percent = Math.round((receivedLength / contentLength) * 100)
-      setDownloadProgress(percent)
-    }
-
-    const blob = new Blob(chunks, { type: 'application/zip' })
-    const url = window.URL.createObjectURL(blob)
-
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'videos.zip'
-    document.body.appendChild(a)
-    a.click()
-
-    a.remove()
-    window.URL.revokeObjectURL(url)
-    setDownloadProgress(0)
-  } catch (err: any) {
-    console.error(err)
-    alert(err.message || 'Erro inesperado')
-  } finally {
-    setIsDownloading(false)
   }
-}
-
 
   const improveDurationFormat = (duration: string) => {
     const parts = duration.split(':')
@@ -272,8 +268,8 @@ export default function Home() {
                   {isDownloading
                     ? `Baixando... ${downloadProgress}%`
                     : selectedCount > 0
-                    ? `Baixar ${selectedCount} Vídeo${selectedCount !== 1 ? 's' : ''}`
-                    : 'Selecione pelo menos um vídeo'}
+                      ? `Baixar ${selectedCount} Vídeo${selectedCount !== 1 ? 's' : ''}`
+                      : 'Selecione pelo menos um vídeo'}
                 </button>
               </motion.div>
             </motion.div>
