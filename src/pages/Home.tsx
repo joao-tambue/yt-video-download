@@ -14,7 +14,7 @@ interface Video {
   title: string
   description: string
   duration: string
-  image_cover: string
+  thumbnail: string
   selected: boolean
   url: string
 }
@@ -32,7 +32,7 @@ export default function Home() {
         title: video.title,
         description: '',
         duration: formatDuration(video.duration),
-        image_cover: video.image_cover,
+        thumbnail: video.thumbnail,
         selected: true,
         url: video.url,
       }))
@@ -201,7 +201,7 @@ export default function Home() {
                       <div className="relative flex items-center gap-4">
                         <div className="relative w-32 h-20 rounded overflow-hidden flex-shrink-0">
                           <img
-                            src={item.image_cover || '/yt-icon.png'}
+                            src={`https://i.ytimg.com/vi/${item.id}/hqdefault.jpg` || '/yt-icon.png'}
                             alt={item.title}
                             className="w-full h-full object-cover"
                           />

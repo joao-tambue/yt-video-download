@@ -3,7 +3,7 @@ import { api } from "../services/api";
 
 export type PlaylistVideo = {
   id: string;
-  image_cover: string;
+  thumbnail: string;
   title: string;
   duration: number;
   url: string
