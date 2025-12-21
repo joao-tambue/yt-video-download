@@ -67,51 +67,31 @@ export default function Home() {
     setVideos(videos.map((video) => ({ ...video, selected: false })))
   }
 
-  const [downloadProgress, setDownloadProgress] = useState(0)
-  const [isDownloading, setIsDownloading] = useState(false)
-
   const handleDownload = async () => {
     try {
       const selectedVideos = videos.filter((v) => v.selected).map((v) => ({ url: v.url }))
 
       if (selectedVideos.length === 0) return
 
-      setIsDownloading(true)
-      setDownloadProgress(0)
-
       const response = await fetch(`${BASE_URL}/downloads/videos`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ videos: selectedVideos }),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          videos: selectedVideos,
+        }),
       })
 
-      if (!response.ok) throw new Error('Erro ao gerar o arquivo')
-
-      const reader = response.body?.getReader()
-      const contentLength = Number(response.headers.get('content-length'))
-
-      if (!reader || !contentLength) {
-        throw new Error('Não foi possível rastrear o progresso do download')
+      if (!response.ok) {
+        throw new Error('Erro ao gerar o arquivo')
       }
 
-      const chunks: BlobPart[] = []
-      let receivedLength = 0
+      const blob = await response.blob()
 
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-
-        chunks.push(value)
-        receivedLength += value.length
-
-        const percent = Math.round((receivedLength / contentLength) * 100)
-        setDownloadProgress(percent)
-      }
-
-      const blob = new Blob(chunks, { type: 'application/zip' })
       const url = window.URL.createObjectURL(blob)
-
       const a = document.createElement('a')
+
       a.href = url
       a.download = 'videos.zip'
       document.body.appendChild(a)
@@ -119,12 +99,9 @@ export default function Home() {
 
       a.remove()
       window.URL.revokeObjectURL(url)
-      setDownloadProgress(0)
     } catch (err: any) {
       console.error(err)
       alert(err.message || 'Erro inesperado')
-    } finally {
-      setIsDownloading(false)
     }
   }
 
@@ -206,7 +183,6 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Lista de videos */}
               <div className="space-y-3 mb-8">
                 <List<Video> items={videos}>
                   {({ item, index }) => (
@@ -265,11 +241,9 @@ export default function Home() {
                   className="w-full py-4 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 disabled:from-gray-700 disabled:to-gray-700 disabled:cursor-not-allowed rounded-lg font-semibold transition-all transform hover:scale-[1.02] active:scale-95 shadow-lg shadow-violet-500/30 flex items-center justify-center gap-3"
                 >
                   <Download className="w-5 h-5" />
-                  {isDownloading
-                    ? `Baixando... ${downloadProgress}%`
-                    : selectedCount > 0
-                      ? `Baixar ${selectedCount} Vídeo${selectedCount !== 1 ? 's' : ''}`
-                      : 'Selecione pelo menos um vídeo'}
+                  {selectedCount > 0
+                    ? `Baixar ${selectedCount} Vídeo${selectedCount !== 1 ? 's' : ''}`
+                    : 'Selecione pelo menos um vídeo'}
                 </button>
               </motion.div>
             </motion.div>
