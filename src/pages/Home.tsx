@@ -27,10 +27,16 @@ export default function Home() {
 
   const [videos, setVideos] = useState<Video[]>([])
 
-  // 🔥 PROGRESS STATE
   const [jobId, setJobId] = useState<string | null>(null)
   const [progress, setProgress] = useState(0)
   const [stage, setStage] = useState<Stage>('idle')
+
+  const [extraInfo, setExtraInfo] = useState({
+    current: 0,
+    total: 0,
+    bytesDownloaded: 0,
+    bytesTotal: 0,
+  })
 
   useEffect(() => {
     if (data?.videos) {
@@ -50,7 +56,6 @@ export default function Home() {
 
   const handleProcessPlaylist = async () => {
     if (!url.trim()) return
-
     await analyzePlaylist(url)
   }
 
@@ -76,10 +81,7 @@ export default function Home() {
 
   const handleDownload = async () => {
     try {
-      const selectedVideos = videos
-        .filter((v) => v.selected)
-        .map((v) => ({ url: v.url }))
-
+      const selectedVideos = videos.filter((v) => v.selected).map((v) => ({ url: v.url }))
       if (selectedVideos.length === 0) return
 
       setProgress(0)
@@ -91,9 +93,7 @@ export default function Home() {
         body: JSON.stringify({ videos: selectedVideos }),
       })
 
-      if (!response.ok) {
-        throw new Error('Erro ao iniciar download')
-      }
+      if (!response.ok) throw new Error('Erro ao iniciar download')
 
       const data = await response.json()
       setJobId(data.job_id)
@@ -104,24 +104,26 @@ export default function Home() {
     }
   }
 
-  // ===============================
   // WEBSOCKET PROGRESS
-  // ===============================
   useEffect(() => {
     if (!jobId) return
 
-    const ws = new WebSocket(
-      `${BASE_URL.replace('http', 'ws')}/ws/progress/${jobId}`
-    )
+    const ws = new WebSocket(`${BASE_URL.replace('http', 'ws')}/ws/progress/${jobId}`)
 
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data)
+
       setProgress(data.percent)
       setStage(data.stage)
 
-      if (data.stage === 'done' || data.stage === 'error') {
-        ws.close()
-      }
+      setExtraInfo({
+        current: data.current ?? 0,
+        total: data.total ?? 0,
+        bytesDownloaded: data.bytes_downloaded ?? 0,
+        bytesTotal: data.bytes_total ?? 0,
+      })
+
+      if (data.stage === 'done' || data.stage === 'error') ws.close()
     }
 
     ws.onerror = () => {
@@ -132,9 +134,7 @@ export default function Home() {
     return () => ws.close()
   }, [jobId])
 
-  // ===============================
   // DOWNLOAD ZIP WHEN DONE
-  // ===============================
   useEffect(() => {
     if (stage !== 'done' || !jobId) return
 
@@ -161,6 +161,8 @@ export default function Home() {
     downloadZip()
   }, [stage, jobId])
 
+  const selectedCount = videos.filter((v) => v.selected).length
+
   const improveDurationFormat = (duration: string) => {
     const parts = duration.split(':')
 
@@ -173,8 +175,6 @@ export default function Home() {
 
     return duration
   }
-
-  const selectedCount = videos.filter((v) => v.selected).length
 
   console.log('VIDEOS: ', videos)
 
@@ -291,16 +291,17 @@ export default function Home() {
                 transition={{ delay: 0.5 }}
                 className="sticky bottom-6 bg-zinc-900 rounded-xl p-6 border border-violet-500/20 shadow-2xl shadow-violet-500/20"
               >
-                {/* 🔥 PROGRESS BAR */}
+                {/* Status de progresso */}
                 {stage !== 'idle' && (
                   <div className="mb-6">
+                    <p className="text-xs text-gray-400 mb-1">
+                      Baixando vídeo {extraInfo.current} de {extraInfo.total} —{' '}
+                      {(extraInfo.bytesDownloaded / 1024 / 1024).toFixed(1)}MB /{' '}
+                      {(extraInfo.bytesTotal / 1024 / 1024).toFixed(1)}MB
+                    </p>
+
                     <div className="flex justify-between text-sm text-gray-400 mb-1">
-                      <span>
-                        {stage === 'downloading' && 'Baixando vídeos'}
-                        {stage === 'zipping' && 'Compactando arquivos'}
-                        {stage === 'done' && 'Concluído'}
-                        {stage === 'error' && 'Erro'}
-                      </span>
+                      <span>{stage === 'downloading' && 'Baixando vídeos'}</span>
                       <span>{progress}%</span>
                     </div>
 
@@ -313,13 +314,13 @@ export default function Home() {
                   </div>
                 )}
                 <button
-                  onClick={handleDownload}
-                  disabled={selectedCount === 0 || stage !== 'idle'}
-                  className="w-full py-4 bg-violet-600 hover:bg-violet-500 disabled:bg-gray-700 rounded-lg font-semibold flex items-center justify-center gap-3"
-                >
-                  <Download />
-                  Baixar {selectedCount} vídeo(s)
-                </button>
+                    onClick={handleDownload}
+                    disabled={selectedCount === 0 || stage !== 'idle'}
+                    className="w-full py-4 bg-violet-600 hover:bg-violet-500 disabled:bg-gray-700 rounded-lg font-semibold flex items-center justify-center gap-3"
+                  >
+                    <Download />
+                    Baixar {selectedCount} vídeo(s)
+                  </button>
               </motion.div>
             </motion.div>
           </AnimatePresence>
