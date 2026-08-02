@@ -1,75 +1,45 @@
-# 🚀 React Starter Template
+# YouTube Playlist Downloader — Frontend
 
-Template base com tudo configurado para iniciar projetos React com:
+Interface web para analisar uma playlist do YouTube, selecionar os vídeos e iniciar o download de um ficheiro ZIP.
 
-- React + TypeScript
-- TailwindCSS
-- ESLint + Prettier
-- Vite
-- Porta local: 500
-- Formatação automática de classes Tailwind
-- VSCode configs
+## Requisitos
 
-## 📦 Instalação
+- Node.js 20 ou superior
+- O [backend](../backend/README.md) iniciado em `http://localhost:2000`
+
+## Executar
 
 ```bash
 npm install
-```
-
-## Rodar projeto
-
-```bash
 npm run dev
 ```
 
-Acesse: [http://localhost:500](http://localhost:500)
+Abra [http://localhost:5000](http://localhost:5000) no navegador.
 
-## Scripts úteis
+## Configuração da API
 
-- `npm run lint`: Corrige problemas de lint com ESLint
-- `npm run format`: Formata com Prettier
+O endereço do backend está em `src/constants/api.ts`:
 
-## Linter e Formatter
-
-- ESLint v9+ com nova estrutura (`eslint.config.js`)
-- Airbnb Style Guide + TypeScript + React
-- `prettier-plugin-tailwindcss` para ordenar classes Tailwind automaticamente
-
-## VSCode recomendado
-
-Crie `.vscode/settings.json` com:
-
-```json
-{
-  "editor.formatOnSave": true,
-  "editor.codeActionsOnSave": {
-    "source.fixAll.eslint": true
-  },
-  "eslint.validate": ["javascript", "typescript", "typescriptreact"],
-  "tailwindCSS.emmetCompletions": true,
-  "prettier.enable": true
-}
+```ts
+export const BASE_URL = 'http://localhost:2000'
 ```
 
-## .gitignore padrão
+Altere esse valor se o backend estiver noutro servidor ou porta.
 
-```gitignore
-node_modules
-dist
-.env
-.vscode
-```
+## Como funciona
 
-## Teste final
+1. Cole a URL de uma playlist do YouTube.
+2. Selecione os vídeos que pretende baixar.
+3. Clique em **Baixar vídeos**.
+4. O navegador inicia o download de `videos.zip` e mostra o progresso na área de Transferências.
 
-1. Salve um `.tsx` com classes Tailwind bagunçadas: elas serão reordenadas automaticamente.
-2. Rode:
+O frontend não guarda os vídeos. O backend envia o ZIP como uma transferência direta para o navegador.
+
+## Scripts
 
 ```bash
-npm run lint
-npm run format
+npm run dev     # inicia o servidor de desenvolvimento
+npm run build   # valida o TypeScript e gera a versão de produção
+npm run lint    # corrige problemas detetados pelo ESLint
+npm run format  # formata os ficheiros com Prettier
 ```
-
----
-
-Feito com 💙 por João
