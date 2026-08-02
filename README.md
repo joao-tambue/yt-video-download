@@ -1,4 +1,4 @@
-# YouTube Playlist Downloader — Frontend
+# YouTube Playlist Downloader
 
 Interface web para analisar uma playlist do YouTube, selecionar os vídeos e iniciar o download de um ficheiro ZIP.
 
