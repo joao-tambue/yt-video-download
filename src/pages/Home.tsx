@@ -19,7 +19,7 @@ interface Video {
   url: string
 }
 
-type Stage = 'idle' | 'downloading' | 'zipping' | 'done' | 'error'
+type Stage = 'idle' | 'downloading'
 
 export default function Home() {
   const [url, setUrl] = useState('')
@@ -27,16 +27,7 @@ export default function Home() {
 
   const [videos, setVideos] = useState<Video[]>([])
 
-  const [jobId, setJobId] = useState<string | null>(null)
-  const [progress, setProgress] = useState(0)
   const [stage, setStage] = useState<Stage>('idle')
-
-  const [extraInfo, setExtraInfo] = useState({
-    current: 0,
-    total: 0,
-    bytesDownloaded: 0,
-    bytesTotal: 0,
-  })
 
   useEffect(() => {
     if (data?.videos) {
@@ -79,87 +70,28 @@ export default function Home() {
     setVideos(videos.map((video) => ({ ...video, selected: false })))
   }
 
-  const handleDownload = async () => {
-    try {
-      const selectedVideos = videos.filter((v) => v.selected).map((v) => ({ url: v.url }))
-      if (selectedVideos.length === 0) return
+  const handleDownload = () => {
+    const selectedUrls = videos.filter((video) => video.selected).map((video) => video.url)
+    if (selectedUrls.length === 0) return
 
-      setProgress(0)
-      setStage('downloading')
+    // O formulário faz o browser processar a resposta como um download nativo.
+    const form = document.createElement('form')
+    form.method = 'POST'
+    form.action = `${BASE_URL}/downloads/stream`
+    form.style.display = 'none'
 
-      const response = await fetch(`${BASE_URL}/downloads/videos`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ videos: selectedVideos }),
-      })
+    const input = document.createElement('input')
+    input.name = 'urls'
+    input.value = JSON.stringify(selectedUrls)
+    form.appendChild(input)
+    document.body.appendChild(form)
 
-      if (!response.ok) throw new Error('Erro ao iniciar download')
+    setStage('downloading')
+    form.submit()
+    form.remove()
 
-      const data = await response.json()
-      setJobId(data.job_id)
-    } catch (err: any) {
-      console.error(err)
-      setStage('error')
-      alert(err.message || 'Erro inesperado')
-    }
+    window.setTimeout(() => setStage('idle'), 1200)
   }
-
-  // WEBSOCKET PROGRESS
-  useEffect(() => {
-    if (!jobId) return
-
-    const ws = new WebSocket(`${BASE_URL.replace('http', 'ws')}/ws/progress/${jobId}`)
-
-    ws.onmessage = (event) => {
-      const data = JSON.parse(event.data)
-
-      setProgress(data.percent)
-      setStage(data.stage)
-
-      setExtraInfo({
-        current: data.current ?? 0,
-        total: data.total ?? 0,
-        bytesDownloaded: data.bytes_downloaded ?? 0,
-        bytesTotal: data.bytes_total ?? 0,
-      })
-
-      if (data.stage === 'done' || data.stage === 'error') ws.close()
-    }
-
-    ws.onerror = () => {
-      setStage('error')
-      ws.close()
-    }
-
-    return () => ws.close()
-  }, [jobId])
-
-  // DOWNLOAD ZIP WHEN DONE
-  useEffect(() => {
-    if (stage !== 'done' || !jobId) return
-
-    const downloadZip = async () => {
-      const response = await fetch(`${BASE_URL}/downloads/download/${jobId}`)
-      const blob = await response.blob()
-
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement('a')
-
-      a.href = url
-      a.download = 'videos.zip'
-      document.body.appendChild(a)
-      a.click()
-
-      a.remove()
-      window.URL.revokeObjectURL(url)
-
-      setJobId(null)
-      setProgress(0)
-      setStage('idle')
-    }
-
-    downloadZip()
-  }, [stage, jobId])
 
   const selectedCount = videos.filter((v) => v.selected).length
 
@@ -291,27 +223,10 @@ export default function Home() {
                 transition={{ delay: 0.5 }}
                 className="sticky bottom-6 bg-zinc-900 rounded-xl p-6 border border-violet-500/20 shadow-2xl shadow-violet-500/20"
               >
-                {/* Status de progresso */}
-                {stage !== 'idle' && (
-                  <div className="mb-6">
-                    <p className="text-xs text-gray-400 mb-1">
-                      Baixando vídeo {extraInfo.current} de {extraInfo.total} —{' '}
-                      {(extraInfo.bytesDownloaded / 1024 / 1024).toFixed(1)}MB /{' '}
-                      {(extraInfo.bytesTotal / 1024 / 1024).toFixed(1)}MB
-                    </p>
-
-                    <div className="flex justify-between text-sm text-gray-400 mb-1">
-                      <span>{stage === 'downloading' && 'Baixando vídeos'}</span>
-                      <span>{progress}%</span>
-                    </div>
-
-                    <div className="w-full bg-gray-700 rounded-full h-3 overflow-hidden">
-                      <div
-                        className="h-full bg-gradient-to-r from-violet-500 to-purple-600 transition-all"
-                        style={{ width: `${progress}%` }}
-                      />
-                    </div>
-                  </div>
+                {stage === 'downloading' && (
+                  <p className="mb-4 text-sm text-gray-400">
+                    O download foi iniciado. Acompanhe o progresso nas Transferências do seu navegador.
+                  </p>
                 )}
                 <button
                     onClick={handleDownload}
